@@ -23,33 +23,41 @@ def get_proxy():
   print("use:%s"%proxy_str)
   return {'http':"http://"+proxy_str}
 
-def handle_item(url):
-  url="http://news.39.net/"+url.split("/root/39_data/news.39.net/")[1]
+def handle_item(path):
+  # url="http://news.39.net/"+path.split("/root/39_data/news.39.net/")[1]
   flag,title,text=False,"",""
   try:
-    request=requests.get(url,proxies=get_proxy(),timeout=5)
-    if request.status_code!=200: raise
-    html=lxml.html.fromstring(request.content.decode("gbk"))
-    if re.search("utf",html.xpath("//meta/@charset")[0]): 
-      html=lxml.html.fromstring(r.content.decode("utf-8"))
+    # request=requests.get(url,proxies=get_proxy(),timeout=5)
+    # if request.status_code!=200: raise
+    with open(path,"r") as file:
+      content=file.read()
+    html=lxml.html.fromstring(content.decode("gbk"))
     try:
-      div=html.xpath("//div[@class='art_left']")[0]
-      title=div.xpath("./div[@class='art_box']/h1/text()")[0]
+      if re.search("utf",html.xpath("//meta/@charset")[0]): 
+       html=lxml.html.fromstring(r.content.decode("utf-8"))
+    except: pass
+    try:
+      if len(html.xpath("//div[@class='art_box']/h1/text()"))>0:
+        title=html.xpath("//div[@class='art_box']/h1/text()")[0]
+      else:
+        title=html.xpath("//div[@class='artbox']/h1/text()")[0]
     except:
       title=""
     print("title:%s"%title)
-    div1=html.xpath("//div[@id='contentText']")[0]
+    if len(html.xpath("//div[@id='contentText']"))>0: div1=html.xpath("//div[@id='contentText']")[0]
+    elif len(html.xpath("//div[@class='article']"))>0: div1=html.xpath("//div[@class='article']")[0]
+    else: raise
     cleaner = Cleaner(scripts = True)
     for p in div1.xpath("./p"):
       p=cleaner.clean_html(p)
       try:
-        text+=p.xpath("text()")[0].strip()+"\n"
+        text+=p.text_content().strip()+"\n"
       except: pass
     print("text:%s"%text)
     flag=True
   except Exception,e:
     print(e)
-  return [flag,title,text,url]
+  return [flag,title,text,path]
 
 def handle_rst(item_rst):
   print("%s\t%s"%(r.get("s_cnt"),r.get("f_cnt")))
@@ -58,9 +66,8 @@ def handle_rst(item_rst):
     r.incr("f_cnt") 
     return False
   db_news.insert_one({"title":item_rst[1],"content":item_rst[2],"path":item_rst[3]})
-  print(item_rst[3].split("http://news.39.net/"))
-  print("begin delete file:%s"%("/root/39_data/news.39.net/"+item_rst[3].split("http://news.39.net/")[1]))
-  os.remove("/root/39_data/news.39.net/"+item_rst[3].split("http://news.39.net/")[1])
+  print("begin delete file:%s"%item_rst[3])
+  os.remove(item_rst[3])
   r.incr("s_cnt")
   return True
 
@@ -87,7 +94,7 @@ r.set("f_cnt",0)
 r.set("s_cnt",0)
 r1=redis.Redis(host="139.129.45.40",port=6379,db=0)
 client=MongoClient("139.129.45.40",27017)
-db_news=client.data_for_39.news
+db_news=client.data_for_39.news_sec
 db_news.remove()
 
 get_item(path)

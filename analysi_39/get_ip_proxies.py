@@ -22,7 +22,7 @@ def handle_item(item):
     elif item.strip().count("#")!=0: item=item.strip().split("#")[0]
     if not len(item)>0: raise
     proxies = {'http':"http://"+item}
-    response=requests.get(test_url,proxies=proxies,timeout=1)
+    response=requests.get(test_url,proxies=proxies,timeout=5)
     print(proxies,response)
     if response.status_code!=200: raise
     r.lpush("ip_proxies",item)
